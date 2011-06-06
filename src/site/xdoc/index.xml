@@ -1,0 +1,18 @@
+<document>
+  <properties>
+    <author>Kyle Sweeney</author>
+    <title>ParLib</title>
+  </properties>
+  <body>
+    <section name="About">
+      <p>
+      ParLib was created as an experiment in distributed computing. 
+      It aims to provide an easy-to-use library for splitting a computationally-expensive
+      job into small tasks and then executing them on remote computers. 
+      </p>
+      <p>
+      It's still in early development, but it's coming along quickly.
+      </p>
+    </section>
+  </body>
+</document>
