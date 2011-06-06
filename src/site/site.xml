@@ -11,6 +11,8 @@
       <item name="About" href="/"/>
       <item name="Scaladocs" href="/scaladocs/index.html"/>
     </menu>
+    
+    <menu ref="reports"></menu>
 	
   </body>
 </project>
