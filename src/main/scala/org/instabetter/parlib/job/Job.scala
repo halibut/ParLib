@@ -24,38 +24,25 @@ import akka.actor.Actor._
 import scala.collection.mutable.Queue
 
 
-abstract class Job[T,R]() extends Serializable{
+final class Job[T,R](private val taskProvider:TaskProvider[T], 
+        onTaskCompleteFunc:(T, R)=>Unit,
+        onClientFunc:(T)=>R) extends Serializable{
     
-    private lazy val _tasks:ResourceQueue[T] = { 
-        val taskPool = new ResourceQueue[T]()
-        taskPool
-    }
-    
-    def addTasks(tasks:Iterable[T]) { tasks.foreach(_tasks.add(_)) }
-    def addTask(task:T){ _tasks.add(task) }
-    def numTasks():Int = { _tasks.getCount() }
-    def takeNextTask():Option[T] = { _tasks.removeNext }
-    def removeTask(task:T){ _tasks.remove(task) }
+    def addTasks(tasks:Iterable[T]) { taskProvider.addTasks(tasks) }
+    def addTask(task:T){ taskProvider.addTask(task) }
+    def numTasks():Int = { taskProvider.numTasks }
+    def takeNextTask():Option[T] = { taskProvider.takeNextTask }
+    def removeTask(task:T){ taskProvider.removeTask(task) }
     
     /**
      * Executes on the server whenever the client has completed a task
      */
-    def taskCompleted(task:T, results:R);
+    val onTaskComplete = onTaskCompleteFunc;
 
     /**
-     * Executes on the client whenever a remote client connects and 
-     * can handle the task.
+     * Executes asynchronously on the client
      */
-    def clientCode(task:T):R;
+    val onClient = onClientFunc;
 
 }
 
-object TestJobs{
-    val test = new Job[String,String](){
-        def taskCompleted(task:String, results:String){}
-        def clientCode(task:String):String = { task + "World" }
-    }
-    
-    test.addTasks(List("Hello", "Goodby"))
-    
-}

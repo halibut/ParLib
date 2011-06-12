@@ -19,40 +19,39 @@ package worker
 
 import job.Job
 import Messages._
-
 import akka.actor._
 import akka.event.EventHandler
 import akka.actor.Actor._
-
 import scala.collection.mutable.{Map}
+import scala.runtime.AbstractFunction1
 
 class RemoteWorker() extends Serializable{
 
-    private def handleTask(jobType:Class[_], task:Any):Any = {
-        val job = getClientJobInstance(jobType)
+    private def handleTask(clientCodeFunc:Class[_], task:Any):Any = {
+        val clientFunc = getClientCodeInstance(clientCodeFunc)
         
-        job.clientCode(task)
+        clientFunc(task)
     }
     
-    private val _jobTypes:Map[Class[_],Job[Any,Any]] = Map()
+    private val _jobTypes:Map[Class[_],AbstractFunction1[Any,Any]] = Map()
     
-    private def getClientJobInstance(jobType:Class[_]):Job[Any,Any] = {
+    private def getClientCodeInstance(jobType:Class[_]):AbstractFunction1[Any,Any] = {
         var jobOpt = _jobTypes.get(jobType)
         
         if(jobOpt.isDefined){
             jobOpt.get
         }else{
-            val jobInst = createJobInstanceForClient(jobType)
+            val jobInst = createClientFuncInstance(jobType)
             _jobTypes += jobType -> jobInst
             jobInst
         }
     }
     
-    private def createJobInstanceForClient(jobType:Class[_]):Job[Any,Any] = {
-        println("Creating new Job: " +jobType)
+    private def createClientFuncInstance(clientCodeFunc:Class[_]):AbstractFunction1[Any,Any] = {
+        println("Creating new client function: " + clientCodeFunc)
         
-        val constructors = jobType.getConstructors
-        val typeParams = jobType.getTypeParameters
+        val constructors = clientCodeFunc.getConstructors
+        val typeParams = clientCodeFunc.getTypeParameters
         var constructor = constructors(0)
         
         for(const <- constructors){
@@ -65,7 +64,7 @@ class RemoteWorker() extends Serializable{
         }
         
         val job = constructor.newInstance()
-        job.asInstanceOf[Job[Any,Any]]
+        job.asInstanceOf[AbstractFunction1[Any,Any]]
     }
     
     private def getNullRefForType[T](clazz:Class[T]):T = {

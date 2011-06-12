@@ -27,9 +27,9 @@ object Messages{
 	//Messages the server sends to the client
 	case class SessionId(sessionLow:Long, sessionHigh:Long);
 	case class TaskId(taskLow:Long, taskHigh:Long);
-	case class StartWorkerTask(jobType:Class[_],taskId:TaskId,task:Any);
+	case class StartWorkerTask(clientCode:Class[_],taskId:TaskId,task:Any);
 	case class NoTasksAvailable();
 	case class Disconnect();
-
 }
+
 

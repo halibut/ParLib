@@ -15,21 +15,6 @@
  */
 
 package org.instabetter.parlib
-/*
- * Copyright 2011 insta-better.org
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 
 import job.{TaskInfo, Job}
 import util.ResourceQueue
@@ -86,11 +71,11 @@ class WorkManager(host:String, port:Int, service:String){
                 for(task <- job.takeNextTask){
                     
                 	val taskId = getNextTaskId
-                    val taskInfo = TaskInfo(jobName, job.getClass, sessionId, taskId, task, new Date())
+                    val taskInfo = TaskInfo(jobName, job.onClient.getClass, sessionId, taskId, task, new Date())
                     tasksForSession
                     _inWorkTasks += taskId -> taskInfo
                     _jobQueue.add(jobName)
-                    return StartWorkerTask(job.getClass, taskId, task)
+                    return StartWorkerTask(job.onClient.getClass, taskId, task)
                 }
                 
                 if(_jobQueue.getCount > 0){
@@ -113,7 +98,7 @@ class WorkManager(host:String, port:Int, service:String){
 	            val task = taskInfo.task
 	            val job = _jobs(jobName)
 	            
-	            job.taskCompleted(task,result)
+	            job.onTaskComplete(task,result)
             }
         }
         
