@@ -38,7 +38,7 @@ object RemoteExampleServer {
     	
     	job.addTasks(strings)
     	
-    	workManager.addJob("testJob", job);
+    	workManager.addJob(job, "testJob");
     }
 }
 

@@ -16,6 +16,10 @@
 
 package org.instabetter.parlib
 
+import job.Job
+import worker.WorkerSession
+import java.util.UUID
+
 
 object Messages{
 	//Messages the client sends to the Server
@@ -25,11 +29,21 @@ object Messages{
 	case class CompletedTask(sessionId:SessionId,taskId:TaskId,taskResult:Any);
 	
 	//Messages the server sends to the client
-	case class SessionId(sessionLow:Long, sessionHigh:Long);
-	case class TaskId(taskLow:Long, taskHigh:Long);
+	case class SessionId(uuid:UUID);
+	case class TaskId(uuid:UUID);
 	case class StartWorkerTask(clientCode:Class[_],taskId:TaskId,task:Any);
 	case class NoTasksAvailable();
+	case class NotRegistered();
 	case class Disconnect();
+	case class AssignJob(job:Job[Any,Any])
+	case class KillSession(sessionid:SessionId)
+	
+	//Messages to manage jobs on the server
+	case class AddJob(name:String, job:Job[Any,Any])
+	case class RemoveJob(job:Job[Any,Any])
+	case class GetJob(jobId:JobId)
+	case class JobId(uuid:UUID);
+	case object NextJob
 }
 
 

@@ -17,44 +17,59 @@
 package org.instabetter.parlib
 package util
 
+import event._
 import akka.actor._
 import akka.actor.Actor._
 import scala.collection.mutable.{Queue}
 
-class ResourceQueue[T]() extends Serializable{
+class ResourceQueue[T]() extends CollectionEventProvider with Serializable{
     import ResourceQueue._
     
-    private val _poolMgr:ActorRef = actorOf(new Actor{
-        val _resources:Queue[T] = Queue()
+    private val _queueMgr:ActorRef = actorOf(new Actor{
+        private val _resources:Queue[T] = Queue()
+        private var _inQueue:Int = 0
         
         def receive = {
-            case Enqueue(res) => {_resources.enqueue(res.asInstanceOf[T])}
-            case Remove(res) => {_resources.dequeueFirst(_ == res)}
-			case Dequeue() => {
+            case Enqueue(res) => 
+                _resources.enqueue(res.asInstanceOf[T])
+                _inQueue += 1
+                if(_inQueue == 1)
+                    triggerEvent(CollectionHasElement)
+            case Remove(res) =>
+                val removed = _resources.dequeueFirst(_ == res)
+                if(removed.isDefined){
+                    _inQueue -= 1
+                    if(_inQueue == 0)
+                        triggerEvent(EmptyCollection)
+                }
+			case Dequeue() => 
 			    if(_resources.isEmpty){
 			        self.reply(None)
 			    }
 			    else{
 				    self.reply(Some(_resources.dequeue))
+				    _inQueue -= 1
+				    if(_inQueue == 0)
+                        triggerEvent(EmptyCollection)
 			    }
-			}
-			case Size() => {self.reply(_resources.size)}
+			case Size() => 
+			    self.reply(_resources.size)
 		}
     }).start
      
     def getCount():Int = {
-        (_poolMgr !! Size()).foreach{value =>
+        (_queueMgr !! Size()).foreach{value =>
             return value.asInstanceOf[Int];
         }
         throw new RuntimeException("Task Manager stopped responding.")
     }
     
     def remove(resource:T){
-        _poolMgr ! Remove(resource)
+        _queueMgr ! Remove(resource)
     }
     
     def removeNext():Option[T] = {
-        val response = _poolMgr !! Dequeue()
+        val response = _queueMgr !! Dequeue()
         response.foreach{removed =>
         	return removed.asInstanceOf[Option[T]].map(_.asInstanceOf[T])
         }
@@ -62,8 +77,11 @@ class ResourceQueue[T]() extends Serializable{
     }
 
     def add(resource:T){
-        _poolMgr ! Enqueue(resource)
+        _queueMgr ! Enqueue(resource)
     }
+    
+    
+   
 }
 
 object ResourceQueue{

@@ -15,16 +15,14 @@
  */
 
 package org.instabetter.parlib
-package job
+package event
 
-import Messages._
-import java.util.Date
-import akka.actor._
+trait CollectionListener {
 
-case class TaskInfo(jobId:JobId, clientCode:Class[_], sessionId:SessionId, taskId:TaskId, task:Any, startTime:Date){
-    private val starTimeMillis = startTime.getTime
+    def handleCollectionEvent(event:Event[CollectionEventMessage]);
     
-    def elapsedTime:Long = {
-        new Date().getTime() - starTimeMillis
-    }
 }
+
+sealed abstract class CollectionEventMessage;
+case object EmptyCollection extends CollectionEventMessage
+case object CollectionHasElement extends CollectionEventMessage
