@@ -31,39 +31,89 @@ import akka.dispatch.Future
 import java.util.UUID
 
 
+/**
+ * This class defines how work is split, computed on remote worker clients, and
+ * then put back together again on the server.
+ * @tparam T type of Task the be processed by this job
+ * @tparam R result type to be returned by the client when it is done processing a task T
+ * @param taskProvider The container that this job uses to manage tasks.
+ * @param onClientFunc The code that will be executed on the client.
+ * @param onTaskCompleteFunc The code that is executed on the server once a task has been completed by the client.
+ * @param synchronizeTaskCompletion If true, the job will process the result of a completed task one at a time.
+ * Otherwise, completed tasks may be processed in parallel. If no onTaskCompleteFunc is defined, this has no effect.  
+ * @param batchSize number of tasks that should be processed by a single client at a time. Most be greater than zero.
+ * This is a hint to the WorkManager. The actual number processed by a client may be determined by batchSize, the
+ * physical size of a task:T, the number of processors on the client, etc...
+ */
 final class Job[T,R](private val taskProvider:TaskProvider[T], 
         onTaskCompleteFunc:(T, R)=>Unit,
         onClientFunc:(T)=>R,
-        synchronizeTaskCompletion:Boolean = false) 
+        synchronizeTaskCompletion:Boolean = false,
+        batchSize:Int = 1) 
         extends Serializable with CollectionEventProvider with CollectionListener{
 
+    require(taskProvider != null, "You must provide a taskProvider.")
+    require(onClientFunc != null, "You must provide a onClient function.")
+    require(batchSize >= 0, "batchSize must be greater than zero. Found " + batchSize)
+    
     val jobId = Job.createId()
     
     taskProvider.addCollectionListener(this)
     
-    private val _taskCompleteActor = actorOf(new Actor(){
-        override def receive = {
-            case Job.TaskComplete(task,result) =>
-                if(onTaskComplete != null){
-		            if(synchronizeTaskCompletion)
-		            	onTaskComplete(task.asInstanceOf[T],result.asInstanceOf[R])
-		            else{
-		                Future{
-		                    onTaskComplete(task.asInstanceOf[T],result.asInstanceOf[R])
-		                }
-		            }
-		        }
-        }
-    }).start()
     
+    val _taskCompleteActor:Option[ActorRef] = 
+    	if(onTaskComplete != null){
+	        val actor = actorOf(new Actor(){
+		        override def receive = {
+		            case Job.TaskComplete(task,result) =>
+		                if(synchronizeTaskCompletion)
+				          	onTaskComplete(task.asInstanceOf[T],result.asInstanceOf[R])
+				        else{
+				            Future{
+				                onTaskComplete(task.asInstanceOf[T],result.asInstanceOf[R])
+				            }
+				        }
+		        }
+		    })
+		    actor.start()
+		    Some(actor)
+    	}
+    	else{
+    	    None
+    	}
+
+    /**
+     * Adds tasks to be completed.
+     * @param tasks the tasks to add to the Job
+     */
     def addTasks(tasks:Iterable[T]) { taskProvider.addTasks(tasks) }
+    
+    /**
+     * Add a single task to be completed
+     * @param task the task to add to the Job
+     */
     def addTask(task:T){ taskProvider.addTask(task) }
+    
+    /**
+     * Get the current number of tasks waiting to be processed 
+     * (does not include tasks that are in work, but not completed yet)
+     */
     def numTasks():Int = { taskProvider.numTasksRemaining }
+    
+    /**
+     * Used by the WorkManager to send to a client to do work.
+     */
     def takeNextTask():Option[T] = { taskProvider.takeNextTask }
+    
+    /**
+     * Remove a task from the Job without processing it by a client.
+     */
     def removeTask(task:T){ taskProvider.removeTask(task) }
     
     def handleTaskComplete(task:T,result:R){
-        _taskCompleteActor ! Job.TaskComplete(task,result)
+        for(actor <- _taskCompleteActor){
+            actor ! Job.TaskComplete(task,result)
+        }
     }
     
     /**
