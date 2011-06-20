@@ -276,7 +276,7 @@
   
   <body class="composite">
 	<div id="titlePanel" class="topLevelPanel centerText">
-        <a href="$relativePath/"><h1>$project.name</h1></a>
+        <a href="$relativePath/"><img src="$relativePath/images/ParLibLogoBlackBlueMed.png" /></a>
 	</div>
 	
 	<div class="clear">
