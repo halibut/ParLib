@@ -19,18 +19,26 @@ package worker
 
 import job.Job
 import Messages._
+import util.Logging
+
 import akka.actor._
 import akka.event.EventHandler
 import akka.actor.Actor._
 import scala.collection.mutable.{Map}
 import scala.runtime.AbstractFunction1
 
-class RemoteWorker() extends Serializable{
 
-    private def handleTask(clientCodeFunc:Class[_], task:Any):Any = {
-        val clientFunc = getClientCodeInstance(clientCodeFunc)
-        
-        clientFunc(task)
+class RemoteWorker() extends Serializable with Logging{
+
+    private def handleTasks(clientCodeFunc:(Any)=>Any, tasks:Iterable[(TaskId,Any)]):Iterable[(TaskId,Any)] = {
+        //parallelize the Iterable and perform the computation for
+        //each task
+        tasks.par.map{(idAndTask) =>
+            val (taskId, task) = idAndTask
+            debug("Starting Task with ID {}.",taskId)
+            val result = clientCodeFunc(task)
+            (taskId, result)
+        }.seq	//convert back to a sequential Iterable
     }
     
     private val _jobTypes:Map[Class[_],AbstractFunction1[Any,Any]] = Map()
@@ -88,6 +96,7 @@ class RemoteWorker() extends Serializable{
             val instOpt = _server !! GetInstruction(sessionId)
             
             if(instOpt.isEmpty){
+                warn("Did not receive a respons from server: {}. Exiting."); 
                 running = false;
             }
             else{
@@ -95,11 +104,14 @@ class RemoteWorker() extends Serializable{
                 inst match{
                     case Disconnect() => running = false;
                     case NoTasksAvailable() => Thread.sleep(1000);
-                    case StartWorkerTask(jobType,taskId,task) => {
-                        val result = handleTask(jobType, task)
-                        _server ! CompletedTask(sessionId,taskId,result);
+                    case StartWorkerTask(clientCode,tasks) => {
+                        val clientFunc = getClientCodeInstance(clientCode)
+                        val results = handleTasks(clientFunc, tasks)
+                        _server ! CompletedTask(sessionId,results);
                     }
-                    case msg => println("Received unknown message: "+msg); running = false;
+                    case msg => 
+                        warn("Received unknown message: {}. Exiting.",msg); 
+                        running = false;
                 }
             }
         }

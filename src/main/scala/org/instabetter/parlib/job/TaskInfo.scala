@@ -21,7 +21,7 @@ import Messages._
 import java.util.Date
 import akka.actor._
 
-case class TaskInfo(jobId:JobId, clientCode:Class[_], sessionId:SessionId, taskId:TaskId, task:Any, startTime:Date){
+case class TaskInfo(jobId:JobId, sessionId:SessionId, taskId:TaskId, task:Any, startTime:Date){
     private val starTimeMillis = startTime.getTime
     
     def elapsedTime:Long = {

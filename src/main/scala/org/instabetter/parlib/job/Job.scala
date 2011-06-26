@@ -62,7 +62,7 @@ final class Job[T,R](private val taskProvider:TaskProvider[T],
     
     
     val _taskCompleteActor:Option[ActorRef] = 
-    	if(onTaskComplete != null){
+    	if(onTaskCompleteFunc != null){
 	        val actor = actorOf(new Actor(){
 		        override def receive = {
 		            case Job.TaskComplete(task,result) =>
@@ -104,6 +104,11 @@ final class Job[T,R](private val taskProvider:TaskProvider[T],
      * Used by the WorkManager to send to a client to do work.
      */
     def takeNextTask():Option[T] = { taskProvider.takeNextTask }
+    
+    /**
+     * Used by the WorkManager to send to a client to do work.
+     */
+    def takeNextBatch():Iterable[T] = { taskProvider.takeNextTasks(batchSize) }
     
     /**
      * Remove a task from the Job without processing it by a client.

@@ -37,6 +37,7 @@ class InMemoryTaskProvider[T] extends TaskProvider[T] with CollectionListener{
     def addTask(task:T){ _tasks.add(task) }
     def numTasksRemaining():Int = { _tasks.getCount() }
     def takeNextTask():Option[T] = { _tasks.removeNext }
+    def takeNextTasks(numTasks:Int):Iterable[T] = { _tasks.removeNext(numTasks) }
     def removeTask(task:T){ _tasks.remove(task) }
 
 

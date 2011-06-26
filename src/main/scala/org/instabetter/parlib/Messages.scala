@@ -19,19 +19,19 @@ package org.instabetter.parlib
 import job.Job
 import worker.WorkerSession
 import java.util.UUID
-
+import akka.actor._
 
 object Messages{
 	//Messages the client sends to the Server
 	case class RegisterClient();
 	case class UnregisterClient(sessionId:SessionId);
 	case class GetInstruction(sessionId:SessionId);
-	case class CompletedTask(sessionId:SessionId,taskId:TaskId,taskResult:Any);
+	case class CompletedTask(sessionId:SessionId,taskResults:Iterable[(TaskId,Any)]);
 	
 	//Messages the server sends to the client
 	case class SessionId(uuid:UUID);
 	case class TaskId(uuid:UUID);
-	case class StartWorkerTask(clientCode:Class[_],taskId:TaskId,task:Any);
+	case class StartWorkerTask(clientCode:Class[_],tasks:Iterable[(TaskId,Any)]);
 	case class NoTasksAvailable();
 	case class NotRegistered();
 	case class Disconnect();

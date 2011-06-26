@@ -34,24 +34,32 @@ class WorkerSession(val sessionId:SessionId) extends Actor {
     
     override def receive = {
         case AssignJob(job) => 
-            val taskOpt = job.takeNextTask
-            taskOpt match{
-                case None => self.reply(NoTasksAvailable())
-                case Some(task) =>
-                    if(!_jobs.contains(job.jobId)){
-                        _jobs += job.jobId -> job
-                    }
-                    val taskId = WorkerSession.createTaskId
-                    val clientCodeClass = job.onClient.getClass
-                    val taskInfo = TaskInfo(job.jobId, clientCodeClass, sessionId, taskId, task, new Date())
-                    _inWorkTasks += taskId -> taskInfo
-                    self.reply(StartWorkerTask(clientCodeClass,taskId,task))
+            val tasks = job.takeNextBatch
+            if(tasks.isEmpty){
+                self.reply(NoTasksAvailable())
             }
-        case CompletedTask(sessionId,taskId,taskResult) =>
-            for(taskInfo <- _inWorkTasks.remove(taskId)){
-                val job = _jobs(taskInfo.jobId)
-                val task = taskInfo.task
-                job.handleTaskComplete(task, taskResult)
+            else{
+                if(!_jobs.contains(job.jobId)){
+                    _jobs += job.jobId -> job
+                }
+                val tasksIterable = tasks.map{task =>
+                    val taskId = WorkerSession.createTaskId
+                    val taskInfo = TaskInfo(job.jobId, sessionId, taskId, task, new Date())
+                    _inWorkTasks += taskId -> taskInfo
+                    (taskId, task)
+                }
+                
+                val clientCodeClass = job.onClient.getClass
+                self.reply(StartWorkerTask(clientCodeClass,tasksIterable))
+            }
+        case CompletedTask(sessionId,taskResults) =>
+            for(idAndResult <- taskResults){
+                val (taskId, taskResult) = idAndResult
+	            for(taskInfo <- _inWorkTasks.remove(taskId)){
+	                val job = _jobs(taskInfo.jobId)
+	                val task = taskInfo.task
+	                job.handleTaskComplete(task, taskResult)
+	            }
             }
         case UnregisterClient(sessionId) =>
             //Add all in work tasks back to the jobs they came from

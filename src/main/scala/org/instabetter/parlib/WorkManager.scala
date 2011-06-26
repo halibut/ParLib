@@ -19,7 +19,7 @@ package org.instabetter.parlib
 import event._
 import job.{TaskInfo, Job, JobManager}
 import worker.{WorkerSessionManager,WorkerSession}
-import util.ResourceQueue
+import util.{ResourceQueue,Logging}
 import Messages._
 
 import akka.actor._
@@ -27,7 +27,7 @@ import akka.actor.Actor._
 import scala.collection.mutable.{Map,Set,HashSet,ArrayBuffer}
 import java.util.Date
 
-class WorkManager(host:String, port:Int, service:String){
+class WorkManager(host:String, port:Int, service:String) extends Logging{
     
     private val _manager = actorOf(new Actor() {
 
@@ -40,6 +40,7 @@ class WorkManager(host:String, port:Int, service:String){
                 val session = actorOf(new WorkerSession(sessionId));
                 session.start();
                 _sessions += sessionId -> session
+                self.reply(sessionId)
             case GetInstruction(sessionId) =>
                 val sessionOpt = _sessions.get(sessionId)
                 sessionOpt match {
@@ -52,22 +53,22 @@ class WorkManager(host:String, port:Int, service:String){
 		                    case Some(Some(jobAny)) =>
 		                        val job = jobAny.asInstanceOf[Job[Any,Any]]		
 		                        val sessionOpt = _sessions.get(sessionId)
-		                        self.reply(session !!! AssignJob(job))			//Reply with a future from the worker session
+		                        session.forward(AssignJob(job))					//Forward to the session that manages the client
 		                }
                 }
-            case CompletedTask(sessionId,taskId,taskResult) => 
-                val sessionOpt = _sessions.get(sessionId)
+            case msg:CompletedTask => 
+                val sessionOpt = _sessions.get(msg.sessionId)
                 sessionOpt match {
                     case None => self.reply(NotRegistered())    //If the session isn't registered, then return a NotRegistered() message
                     case Some(session) =>
-                        self.forward(session)					//Forward to the session responsible for the task
+                        session.forward(msg)					//Forward to the session responsible for the task
                 }
-            case UnregisterClient(sessionId) => 
-                val sessionOpt = _sessions.get(sessionId)
+            case msg:UnregisterClient => 
+                val sessionOpt = _sessions.get(msg.sessionId)
                 sessionOpt match {
                     case None => self.reply(NotRegistered())    //If the session isn't registered, then return a NotRegistered() message
                     case Some(session) =>
-                        self.forward(session)					//Tell the session to clean up and prepare to be stopped
+                        session.forward(msg)					//Tell the session to clean up and prepare to be stopped
                 }
             case KillSession(sessionId) =>
                 //This message is sent by the Session, and it means
@@ -77,15 +78,30 @@ class WorkManager(host:String, port:Int, service:String){
                 sessionOpt.foreach{session =>
                     session.stop()
                 }
-            case AddJob(name,job) => self.forward(_jobManager.managerActor); 
-            case RemoveJob(jobId) => self.forward(_jobManager.managerActor);
+            case msg:AddJob => _jobManager.managerActor.forward(msg); 
+            case msg:RemoveJob => _jobManager.managerActor.forward(msg);
+            case msg => warn("Unhandled Message: {}",msg)
         }
         
         
     }).start
     
+    val _listener = actorOf(new Actor {
+	  def receive = {
+//	    case RemoteClientError(cause, client, address) => //... act upon error
+//	    case RemoteClientDisconnected(client, address) => //... act upon disconnection
+//	    case RemoteClientConnected(client, address)    => //... act upon connection
+//	    case RemoteClientStarted(client, address)      => //... act upon client shutdown
+//	    case RemoteClientShutdown(client, address)     => //... act upon client shutdown
+//	    case RemoteClientWriteFailed(request, cause, client, address) => //... act upon write failure
+	    case msg =>
+	        debug("Client event: {}",msg)
+	  }
+	}).start()
+    
     remote.start(host, port)
 	remote.register(service, _manager)
+	remote.addListener(_listener)
 	
 	def addJob[T,R](job:Job[T,R], name:String = "Job"){
         _manager ! AddJob(name, job.asInstanceOf[Job[Any,Any]])

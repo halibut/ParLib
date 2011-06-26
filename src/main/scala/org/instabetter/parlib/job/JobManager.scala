@@ -67,7 +67,7 @@ class JobManager {
     	private val _jobQueue:Queue[JobId] = Queue()
     	
     	override def receive = {
-    	   case AddJob(name,job) => self.reply(addJob(name,job)); 
+    	   case AddJob(name,job) => addJob(name,job); 
            case RemoveJob(job) => removeJob(job);
            case GetJob(jobId) => self.reply(getJob(jobId))
            case QueueJob(jobId) => queueJob(jobId);

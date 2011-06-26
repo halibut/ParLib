@@ -48,6 +48,14 @@ trait TaskProvider[T] extends CollectionEventProvider{
     def takeNextTask():Option[T];
     
     /**
+     * @param the number of tasks to retrieve
+     * @return an Iterable[T] that will contain the next numTasks tasks in the provider.
+     * If there are fewer than numTasks remaining, it will return all the remaining tasks.
+	 * If none are available, the Iterable will be empty
+     */
+    def takeNextTasks(numTasks:Int):Iterable[T];
+    
+    /**
      * Removes a task from the provider
      * @param task the task to remove
      */

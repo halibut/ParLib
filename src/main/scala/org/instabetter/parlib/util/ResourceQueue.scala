@@ -20,7 +20,7 @@ package util
 import event._
 import akka.actor._
 import akka.actor.Actor._
-import scala.collection.mutable.{Queue}
+import scala.collection.mutable.{Queue,ArrayBuffer}
 
 class ResourceQueue[T]() extends CollectionEventProvider with Serializable{
     import ResourceQueue._
@@ -39,22 +39,26 @@ class ResourceQueue[T]() extends CollectionEventProvider with Serializable{
                 val removed = _resources.dequeueFirst(_ == res)
                 if(removed.isDefined){
                     _inQueue -= 1
-                    if(_inQueue == 0)
-                        triggerEvent(EmptyCollection)
+                    checkForEmptyCollection()
                 }
-			case Dequeue() => 
-			    if(_resources.isEmpty){
-			        self.reply(None)
+			case Dequeue(numElements) => 
+			    var count = numElements
+		        var elements = ArrayBuffer[T]()
+		        while(_inQueue > 0 && count > 0){
+		            elements += _resources.dequeue
+		            count -= 1
+		            _inQueue -= 1
 			    }
-			    else{
-				    self.reply(Some(_resources.dequeue))
-				    _inQueue -= 1
-				    if(_inQueue == 0)
-                        triggerEvent(EmptyCollection)
-			    }
+			    checkForEmptyCollection()
+		        self.reply(elements)
 			case Size() => 
 			    self.reply(_resources.size)
 		}
+        
+        private def checkForEmptyCollection(){
+            if(_inQueue == 0)
+                triggerEvent(EmptyCollection)
+        }
     }).start
      
     def getCount():Int = {
@@ -69,11 +73,20 @@ class ResourceQueue[T]() extends CollectionEventProvider with Serializable{
     }
     
     def removeNext():Option[T] = {
-        val response = _queueMgr !! Dequeue()
+        val removed = removeNext(1)
+        if(removed.isEmpty)
+            None
+        else
+            Some(removed.head)
+    }
+    
+    def removeNext(numElements:Int):Iterable[T] = {
+        val response = _queueMgr !! Dequeue(numElements)
         response.foreach{removed =>
-        	return removed.asInstanceOf[Option[T]].map(_.asInstanceOf[T])
+        	val elements = removed.asInstanceOf[Iterable[T]]
+        	return elements
         }
-        throw new RuntimeException("Task Manager stopped responding.")
+        ArrayBuffer()
     }
 
     def add(resource:T){
@@ -87,7 +100,7 @@ class ResourceQueue[T]() extends CollectionEventProvider with Serializable{
 object ResourceQueue{
     case class Enqueue(resource:Any)
     case class Remove(resource:Any)
-    case class Dequeue()
+    case class Dequeue(numElements:Int)
     case class Size()
     
     abstract class PoolEvent()
