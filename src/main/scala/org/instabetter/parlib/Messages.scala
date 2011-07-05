@@ -23,18 +23,25 @@ import akka.actor._
 
 object Messages{
 	//Messages the client sends to the Server
+	trait ClientMessage{val sessionId:SessionId}
 	case class RegisterClient();
-	case class UnregisterClient(sessionId:SessionId);
-	case class GetInstruction(sessionId:SessionId);
-	case class CompletedTask(sessionId:SessionId,taskResults:Iterable[(TaskId,Any)]);
+	case class UnregisterClient(val sessionId:SessionId) extends ClientMessage;
+	case class GetInstruction(val sessionId:SessionId) extends ClientMessage;
+	case class CompletedTask(val sessionId:SessionId,taskResults:Iterable[(TaskId,Any)]) extends ClientMessage;
 	
 	//Messages the server sends to the client
+	trait ServerMessage;
+	case class StartWorkerTask(jobClass:Class[_],tasks:Iterable[(TaskId,Any)]) extends ServerMessage;
+	case class NoTasksAvailable() extends ServerMessage;
+	case class NotRegistered(msg:String) extends ServerMessage;
+	case class Disconnect() extends ServerMessage;
+	
+	//General purpose messages
 	case class SessionId(uuid:UUID);
 	case class TaskId(uuid:UUID);
-	case class StartWorkerTask(clientCode:Class[_],tasks:Iterable[(TaskId,Any)]);
-	case class NoTasksAvailable();
-	case class NotRegistered();
-	case class Disconnect();
+	case class JobId(uuid:UUID);
+	
+	//Server inter-actor communication
 	case class AssignJob(job:Job[Any,Any])
 	case class KillSession(sessionid:SessionId)
 	
@@ -42,7 +49,6 @@ object Messages{
 	case class AddJob(name:String, job:Job[Any,Any])
 	case class RemoveJob(job:Job[Any,Any])
 	case class GetJob(jobId:JobId)
-	case class JobId(uuid:UUID);
 	case object NextJob
 }
 

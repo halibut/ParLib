@@ -30,49 +30,46 @@ import scala.runtime.AbstractFunction1
 
 class RemoteWorker() extends Serializable with Logging{
 
-    private def handleTasks(clientCodeFunc:(Any)=>Any, tasks:Iterable[(TaskId,Any)]):Iterable[(TaskId,Any)] = {
+    private def handleTasks(job:Job[Any,Any], tasks:Iterable[(TaskId,Any)]):Iterable[(TaskId,Any)] = {
         //parallelize the Iterable and perform the computation for
         //each task
         tasks.par.map{(idAndTask) =>
             val (taskId, task) = idAndTask
-            debug("Starting Task with ID {}.",taskId)
-            val result = clientCodeFunc(task)
+            val result = job.onClient(task)
             (taskId, result)
         }.seq	//convert back to a sequential Iterable
     }
     
-    private val _jobTypes:Map[Class[_],AbstractFunction1[Any,Any]] = Map()
+    private val _jobTypes:Map[Class[_],Job[Any,Any]] = Map()
     
-    private def getClientCodeInstance(jobType:Class[_]):AbstractFunction1[Any,Any] = {
+    private def getClientCodeInstance(jobType:Class[_]):Job[Any,Any] = {
         var jobOpt = _jobTypes.get(jobType)
         
         if(jobOpt.isDefined){
             jobOpt.get
         }else{
-            val jobInst = createClientFuncInstance(jobType)
+            val jobInst = createClientJobInstance(jobType)
             _jobTypes += jobType -> jobInst
             jobInst
         }
     }
     
-    private def createClientFuncInstance(clientCodeFunc:Class[_]):AbstractFunction1[Any,Any] = {
-        println("Creating new client function: " + clientCodeFunc)
+    private def createClientJobInstance(jobClass:Class[_]):Job[Any,Any] = {
+        println("Creating new job client: " + jobClass)
         
-        val constructors = clientCodeFunc.getConstructors
-        val typeParams = clientCodeFunc.getTypeParameters
+        val constructors = jobClass.getConstructors
         var constructor = constructors(0)
         
         for(const <- constructors){
             if(const.getParameterTypes.size < constructor.getParameterTypes.size)
                 constructor = const
         }
+
+        val paramTypes = constructor.getParameterTypes
         
-        if(constructor.getTypeParameters.size > 0){
-            throw new RuntimeException("Requires a no-arg constructor.")
-        }
-        
-        val job = constructor.newInstance()
-        job.asInstanceOf[AbstractFunction1[Any,Any]]
+        //Job has 3 constructor arguments
+        val job = constructor.newInstance(null, Boolean.box(false), Int.box(1))
+        job.asInstanceOf[Job[Any,Any]]
     }
     
     private def getNullRefForType[T](clazz:Class[T]):T = {
@@ -95,8 +92,9 @@ class RemoteWorker() extends Serializable with Logging{
         while(running){
             val instOpt = _server !! GetInstruction(sessionId)
             
+            
             if(instOpt.isEmpty){
-                warn("Did not receive a respons from server: {}. Exiting."); 
+                warn("Did not receive a response from server. Exiting."); 
                 running = false;
             }
             else{
@@ -105,8 +103,8 @@ class RemoteWorker() extends Serializable with Logging{
                     case Disconnect() => running = false;
                     case NoTasksAvailable() => Thread.sleep(1000);
                     case StartWorkerTask(clientCode,tasks) => {
-                        val clientFunc = getClientCodeInstance(clientCode)
-                        val results = handleTasks(clientFunc, tasks)
+                        val job = getClientCodeInstance(clientCode)
+                        val results = handleTasks(job, tasks)
                         _server ! CompletedTask(sessionId,results);
                     }
                     case msg => 
@@ -115,7 +113,6 @@ class RemoteWorker() extends Serializable with Logging{
                 }
             }
         }
-        
     }
 
 }

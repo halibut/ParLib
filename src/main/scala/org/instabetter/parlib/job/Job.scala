@@ -45,42 +45,40 @@ import java.util.UUID
  * This is a hint to the WorkManager. The actual number processed by a client may be determined by batchSize, the
  * physical size of a task:T, the number of processors on the client, etc...
  */
-final class Job[T,R](private val taskProvider:TaskProvider[T], 
-        onTaskCompleteFunc:(T, R)=>Unit,
-        onClientFunc:(T)=>R,
-        synchronizeTaskCompletion:Boolean = false,
-        batchSize:Int = 1) 
-        extends Serializable with CollectionEventProvider with CollectionListener{
-
-    require(taskProvider != null, "You must provide a taskProvider.")
-    require(onClientFunc != null, "You must provide a onClient function.")
-    require(batchSize >= 0, "batchSize must be greater than zero. Found " + batchSize)
+abstract class Job[T,R](jobTaskProvider:TaskProvider[T], 
+        val synchronizeTaskCompletion:Boolean = false,
+        val batchSize:Int = 1) 
+        extends CollectionEventProvider with CollectionListener{
     
-    val jobId = Job.createId()
+    private lazy val taskProvider = jobTaskProvider
+    lazy val jobId = Job.createId()
+    
+    /**
+     * Executes on the server whenever the client has completed a task
+     */
+    def onTaskComplete(task:T,result:R):Unit = {}
+    
+    /**
+     * Executes on the client for each task
+     */
+    def onClient(task:T):R; 
     
     taskProvider.addCollectionListener(this)
     
-    
-    val _taskCompleteActor:Option[ActorRef] = 
-    	if(onTaskCompleteFunc != null){
-	        val actor = actorOf(new Actor(){
-		        override def receive = {
-		            case Job.TaskComplete(task,result) =>
-		                if(synchronizeTaskCompletion)
-				          	onTaskComplete(task.asInstanceOf[T],result.asInstanceOf[R])
-				        else{
-				            Future{
-				                onTaskComplete(task.asInstanceOf[T],result.asInstanceOf[R])
-				            }
-				        }
+    private val _taskCompleteActor = actorOf(new Actor(){
+	    override def receive = {
+	        case Job.TaskComplete(task,result) =>
+	            if(synchronizeTaskCompletion)
+		          	onTaskComplete(task.asInstanceOf[T],result.asInstanceOf[R])
+		        else{
+		            Future{
+		                onTaskComplete(task.asInstanceOf[T],result.asInstanceOf[R])
+		            }
 		        }
-		    })
-		    actor.start()
-		    Some(actor)
-    	}
-    	else{
-    	    None
-    	}
+        }
+    })
+	_taskCompleteActor.start()
+	
 
     /**
      * Adds tasks to be completed.
@@ -116,26 +114,12 @@ final class Job[T,R](private val taskProvider:TaskProvider[T],
     def removeTask(task:T){ taskProvider.removeTask(task) }
     
     def handleTaskComplete(task:T,result:R){
-        for(actor <- _taskCompleteActor){
-            actor ! Job.TaskComplete(task,result)
-        }
+        _taskCompleteActor ! Job.TaskComplete(task,result)
     }
-    
-    /**
-     * Executes on the server whenever the client has completed a task
-     */
-    val onTaskComplete = onTaskCompleteFunc;
-
-    /**
-     * Executes asynchronously on the client
-     */
-    val onClient = onClientFunc;
-    
     
     def handleCollectionEvent(event:Event[CollectionEventMessage]){
         triggerEvent(event.eventMessage)
     }
-    
 }
 
 object Job{

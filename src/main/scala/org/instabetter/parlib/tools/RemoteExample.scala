@@ -27,16 +27,18 @@ object RemoteExampleServer {
     	val workManager = new WorkManager("localhost",8888,"service")
     	
     	val strings = List("Hello", "Goodby", "Blow up the outside", "Remote control", "Test the")
-    	val job = new Job[String,String](taskProvider = new InMemoryTaskProvider(),
-    	        onTaskCompleteFunc = (task:String, result:String) => {
-    	            println(result)
-    	        },
-    	        onClientFunc = (task:String) => {
-    	            println("Got: " + task)
-	    	        Thread.sleep(5000);
-	    	        task + " world."
-    	        },
-    	        batchSize = 2);
+    	val job = new Job[String,String](
+    	        jobTaskProvider = new InMemoryTaskProvider(),
+    	        batchSize = 2){
+    	    override def onTaskComplete(task:String, result:String) = {
+    	        println(result)
+    	    }
+    	    def onClient(task:String) = {
+	            println("Got: " + task)
+    	        Thread.sleep(5000);
+    	        task + " world."
+	        }
+    	}
     	
     	job.addTasks(strings)
     	
