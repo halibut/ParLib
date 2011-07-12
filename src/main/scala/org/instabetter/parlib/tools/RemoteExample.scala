@@ -17,8 +17,8 @@
 package org.instabetter.parlib
 package tools
 
-import job.{Job,InMemoryTaskProvider}
-import worker.RemoteWorker
+import job.{Job,InMemoryTaskProvider,ClientRunnable}
+import worker.client.RemoteWorker
 import util.Logging
 
 object RemoteExampleServer {
@@ -27,28 +27,22 @@ object RemoteExampleServer {
     	val workManager = new WorkManager("localhost",8888,"service")
     	
     	val strings = List("Hello", "Goodby", "Blow up the outside", "Remote control", "Test the")
-    	val job = new Job[String,String](
-    	        jobTaskProvider = new InMemoryTaskProvider(),
-    	        batchSize = 2){
-    	    override def onTaskComplete(task:String, result:String) = {
-    	        println(result)
-    	    }
-    	    def onClient(task:String) = {
-	            println("Got: " + task)
-    	        Thread.sleep(5000);
-    	        task + " world."
-	        }
+    	val job:Job[String,String] = Job{task =>
+            println("Got: " + task)
+	        Thread.sleep(5000);
+	        task + " world."
     	}
     	
     	job.addTasks(strings)
     	
     	workManager.addJob(job, "testJob");
     }
+    
 }
 
 object RemoteExampleClient {
     def main(args:Array[String]):Unit = {
-    	val worker = new RemoteWorker
-    	worker.run("localhost",8888,"service")
+    	val worker = new RemoteWorker("localhost",8888,"service")
+    	worker.run()
     }
 }

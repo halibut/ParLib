@@ -45,40 +45,39 @@ import java.util.UUID
  * This is a hint to the WorkManager. The actual number processed by a client may be determined by batchSize, the
  * physical size of a task:T, the number of processors on the client, etc...
  */
-abstract class Job[T,R](jobTaskProvider:TaskProvider[T], 
-        val synchronizeTaskCompletion:Boolean = false,
+final class Job[T,R](
+        val taskProvider: TaskProvider[T], 
+        clientCode: ClientRunnable[T,R],
+        serverCode: ServerRunnable[T,R],
         val batchSize:Int = 1) 
         extends CollectionEventProvider with CollectionListener{
     
-    private lazy val taskProvider = jobTaskProvider
-    lazy val jobId = Job.createId()
-    
-    /**
-     * Executes on the server whenever the client has completed a task
-     */
-    def onTaskComplete(task:T,result:R):Unit = {}
-    
-    /**
-     * Executes on the client for each task
-     */
-    def onClient(task:T):R; 
+    require(taskProvider != null, "taskProvider is required.")
+    require(clientCode != null, "clientCode is required.")
     
     taskProvider.addCollectionListener(this)
     
-    private val _taskCompleteActor = actorOf(new Actor(){
-	    override def receive = {
-	        case Job.TaskComplete(task,result) =>
-	            if(synchronizeTaskCompletion)
-		          	onTaskComplete(task.asInstanceOf[T],result.asInstanceOf[R])
-		        else{
-		            Future{
-		                onTaskComplete(task.asInstanceOf[T],result.asInstanceOf[R])
-		            }
-		        }
-        }
-    })
-	_taskCompleteActor.start()
-	
+    private val onClient = clientCode 
+    private val onServer = 
+        if(serverCode == null)
+        	new NoOpServerRunnable[T,R]()
+        else
+            serverCode
+    
+    val jobId = Job.createId()
+    
+    //Lazily start the _taskCompleteActor, if server code's postComputeTask
+    //Needs to be run sequentially
+    private lazy val _taskCompleteActor = {
+        val actor = actorOf(new Actor(){
+	        override def receive = {
+		        case Job.TaskComplete(task,result) =>
+		            onServer.postComputeTask(task.asInstanceOf[T],result.asInstanceOf[R])
+	        }
+	    })
+	    actor.start()
+	    actor
+    }
 
     /**
      * Adds tasks to be completed.
@@ -114,11 +113,22 @@ abstract class Job[T,R](jobTaskProvider:TaskProvider[T],
     def removeTask(task:T){ taskProvider.removeTask(task) }
     
     def handleTaskComplete(task:T,result:R){
-        _taskCompleteActor ! Job.TaskComplete(task,result)
+        if(!onServer.synchronizePostComputeTask){
+            Future{
+                onServer.postComputeTask(task.asInstanceOf[T],result.asInstanceOf[R])
+            }
+        }
+        else{
+        	_taskCompleteActor ! Job.TaskComplete(task,result)
+        }
     }
     
     def handleCollectionEvent(event:Event[CollectionEventMessage]){
         triggerEvent(event.eventMessage)
+    }
+    
+    def getClientRunnable = {
+        onClient
     }
 }
 
@@ -129,4 +139,13 @@ object Job{
     }
     
     private case class TaskComplete[T,R](task:T,result:R)
+    
+    def apply[T,R](clientCode: (T)=>R):Job[T,R] = {
+        new Job[T,R](
+            new InMemoryTaskProvider[T],
+            new RunOnClientFunc(clientCode),
+            new NoOpServerRunnable[T,R]()
+        )
+    }
+    
 }

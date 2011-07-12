@@ -76,8 +76,8 @@ class WorkerSession(private val workManager:ActorRef, private val jobManager:Act
 		                    (taskId, task)
 		                }
 		                
-		                val jobClass = job.getClass
-		                self.reply(StartWorkerTask(jobClass,tasksIterable))
+		                val clientClassName = job.getClientRunnable.clientClassName
+		                self.reply(StartWorkerTask(clientClassName,tasksIterable))
 		            }
             }
 		case CompletedTask(sessionId,taskResults) =>

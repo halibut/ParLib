@@ -31,7 +31,7 @@ object Messages{
 	
 	//Messages the server sends to the client
 	trait ServerMessage;
-	case class StartWorkerTask(jobClass:Class[_],tasks:Iterable[(TaskId,Any)]) extends ServerMessage;
+	case class StartWorkerTask(clientClassName:String,tasks:Iterable[(TaskId,Any)]) extends ServerMessage;
 	case class NoTasksAvailable() extends ServerMessage;
 	case class NotRegistered(msg:String) extends ServerMessage;
 	case class Disconnect() extends ServerMessage;

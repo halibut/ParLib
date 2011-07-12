@@ -17,7 +17,7 @@
 package org.instabetter.parlib
 package tools
 
-import worker.RemoteWorker
+import worker.client.RemoteWorker
 
 object ClientRunner {
     private val HELP_ARG = "-help"
@@ -42,8 +42,8 @@ object ClientRunner {
     }
     
     private def startClient(host:String,port:Int,service:String):RemoteWorker = {
-        val worker = new RemoteWorker()
-        worker.run(host,port,service)
+        val worker = new RemoteWorker(host,port,service)
+        worker.run()
         worker
     }
     

@@ -59,6 +59,7 @@ class WorkManager(host:String, port:Int, service:String) extends Logging{
 	  def receive = {
 	    case msg:RemoteClientError => warn("An error occured: {}",msg)
 	    case msg:RemoteClientWriteFailed => warn("A write failed: {}",msg)
+	    case msg => debug("Received RemoteClient message: {}", msg)
 	  }
 	}).start()
 
