@@ -21,21 +21,26 @@ import job.{Job,InMemoryTaskProvider,ClientRunnable}
 import worker.client.RemoteWorker
 import util.Logging
 
+
 object RemoteExampleServer {
 
+    import org.instabetter.parlib._
+    
     def main(args:Array[String]):Unit = {
-    	val workManager = new WorkManager("localhost",8888,"service")
+    	Config.workerManagerPort = 8888;
+    	Config.workerManagerHost = "localhost"
+    	Config.workerManagerName = "service"
     	
     	val strings = List("Hello", "Goodby", "Blow up the outside", "Remote control", "Test the")
-    	val job:Job[String,String] = Job{task =>
+    	val mappedStrings = strings.distribMap{task =>
             println("Got: " + task)
 	        Thread.sleep(5000);
 	        task + " world."
     	}
     	
-    	job.addTasks(strings)
-    	
-    	workManager.addJob(job, "testJob");
+    	for(str <- mappedStrings){
+    	    println(str)
+    	}
     }
     
 }

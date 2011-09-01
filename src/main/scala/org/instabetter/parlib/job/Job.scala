@@ -83,7 +83,7 @@ final class Job[T,R](
      * Adds tasks to be completed.
      * @param tasks the tasks to add to the Job
      */
-    def addTasks(tasks:Iterable[T]) { taskProvider.addTasks(tasks) }
+    def addTasks(tasks:Traversable[T]) { taskProvider.addTasks(tasks) }
     
     /**
      * Add a single task to be completed
@@ -130,6 +130,7 @@ final class Job[T,R](
     def getClientRunnable = {
         onClient
     }
+    
 }
 
 object Job{

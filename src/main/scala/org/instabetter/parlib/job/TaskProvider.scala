@@ -29,7 +29,7 @@ trait TaskProvider[T] extends CollectionEventProvider{
     /**
      * @param tasks the tasks to add to the provider
      */
-    def addTasks(tasks:Iterable[T]);
+    def addTasks(tasks:Traversable[T]);
     
     /**
      * @param task the task to add to the provider
