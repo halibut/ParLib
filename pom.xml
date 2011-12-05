@@ -8,6 +8,7 @@
   <name>ParLib</name>
   <url>http://insta-better.org/parlib</url>
   <description>Library for parallel and distributed computing.</description>
+  
   <inceptionYear>2011</inceptionYear>
   <developers>
     <developer>
@@ -31,9 +32,9 @@
   </licenses>
   
   <scm>
-    <connection>scm:git:git@github.com:juven/git-demo.git</connection>
-    <developerConnection>scm:git:git@github.com:juven/git-demo.git</developerConnection>
-    <url>git@github.com:juven/git-demo.git</url>
+    <connection>scm:git:git@github.com:halibut/ParLib.git</connection>
+    <developerConnection>scm:git:git@github.com:halibut/ParLib.git</developerConnection>
+    <url>https://github.com/halibut/ParLib</url>
   </scm>
     
   <organization>
@@ -47,6 +48,11 @@
       <url>ftp://insta-better.org</url>
     </site>
   </distributionManagement>
+  
+  <issueManagement>
+  	<system>GitHub</system>
+  	<url>https://github.com/halibut/ParLib/issues</url>
+  </issueManagement>
 
   <properties>
 	<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -142,6 +148,7 @@
 	
       <plugin>
         <artifactId>maven-site-plugin</artifactId>
+        <version>3.0</version>
         <configuration>
           <templateDirectory>src/site</templateDirectory>
           <template>site.vm</template>
@@ -197,6 +204,18 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-project-info-reports-plugin</artifactId>
         <version>2.1.1</version>
+        <reportSets>
+          <reportSet>
+            <reports>
+              <report>dependencies</report>
+              <report>project-team</report>
+              <report>mailing-list</report>
+              <report>issue-tracking</report>
+              <report>license</report>
+              <report>scm</report>
+            </reports>
+          </reportSet>
+        </reportSets>
       </plugin>
       <plugin>
         <groupId>org.scala-tools</groupId>

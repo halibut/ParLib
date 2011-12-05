@@ -3,3 +3,4 @@ target/
 .settings/
 .classpath
 .scala_dependencies
+.cache
